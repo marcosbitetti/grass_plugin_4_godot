@@ -1,6 +1,6 @@
 # grass_plugin_4_godot
 
-<img src="https://raw.githubusercontent.com/marcosbitetti/grass_plugin_4_godot/master/ico.svg" alt="logo" style="width: 128px; height: 128px; display: block;" />
+<img src="https://raw.githubusercontent.com/marcosbitetti/grass_plugin_4_godot/master/ico.png" alt="logo" style="width: 128px; height: 128px; display: block;" />
 
 A plugin to handle huge amount of grass, foliages and other vegetations for <a href="http://www.godotengine.org/projects/godot-engine" target="_blank">Godot Game Engine</a>.
 
