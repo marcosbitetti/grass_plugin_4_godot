@@ -1,0 +1,102 @@
+#!grass_plugin v1.0.0
+##################################################################################
+# file: {%file_name}                                                             #
+##################################################################################
+#  This file is part of:                                                         #
+#  {%project_name}                                                               #
+##################################################################################
+#  Copyright (c) {%year} {%copyright_holders}                                    #
+#                                                                                #
+#  Permission is hereby granted, free of charge, to any person obtaining a copy  #
+#  of this software and associated documentation files (the "Software"), to deal #
+#  in the Software without restriction, including without limitation the rights  #
+#  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell     #
+#  copies of the Software, and to permit persons to whom the Software is         #
+#  furnished to do so, subject to the following conditions:                      #
+#                                                                                #
+#  The above copyright notice and this permission notice shall be included in    #
+#  all copies or substantial portions of the Software.                           #
+#                                                                                #
+#  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR    #
+#  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,      #
+#  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE   #
+#  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER        #
+#  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, #
+#  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN     #
+#  THE SOFTWARE.                                                                 #
+##################################################################################
+#
+tool
+extends Spatial
+
+# distance between elements
+var grass_step = {%grass_step}
+# arrays temporary store data
+var mesh_layers_data = [{%mesh_list}]
+var material_layers_data = [{%material_list}]
+var mesh_layers = []
+var material_layers = []
+# data from grass is array of quarters -> index, rotation, scale, height
+var data = {%data_entry}
+
+# mount base transformations
+func setup_matrix():
+	var aabb = get_parent().get_aabb()
+	var dist = aabb.size / grass_step
+	var mt = Array()
+	var zz = aabb.pos.z
+	for z in range(ceil(dist.z)):
+		#var lin = Array()
+		var xx = aabb.pos.x
+		for x in range(ceil(dist.x)):
+			var dt = Transform()
+			dt.origin = Vector3(xx,0,zz)
+			#lin.push_back(dt)
+			mt.push_back(dt)
+			xx += grass_step
+		#mt.push_back(lin)
+		zz += grass_step
+	return mt
+
+# load resources
+func setup_resources():
+	for m in mesh_layers_data:
+		mesh_layers.push_back( ResourceLoader.load(m,'Mesh') )
+	for m in material_layers_data:
+		material_layers.push_back( ResourceLoader.load(m,'Material') )
+
+# mound the entire scene
+func _ready():
+	setup_resources()
+	var mat = setup_matrix()
+	var instances = []
+	for i in range(mesh_layers.size()):
+		var multimesh_i = MultiMeshInstance.new()
+		var multimesh = MultiMesh.new()
+		multimesh.set_mesh( mesh_layers[i] )
+		multimesh_i.set_multimesh(multimesh)
+		multimesh_i.set_material_override( material_layers[i] )
+		multimesh_i.set_flag(GeometryInstance.FLAG_CAST_SHADOW,false)
+		multimesh_i.set_flag(GeometryInstance.FLAG_RECEIVE_SHADOWS,false)
+		multimesh_i.set_draw_range_begin(get_parent().get_draw_range_begin())
+		multimesh_i.set_draw_range_end(get_parent().get_draw_range_end())
+		var layer_data = data[i]
+		multimesh.set_instance_count( ceil(layer_data.size()/4) )
+		var i2 = 0
+		var ic = 0
+		while i2<layer_data.size():
+			var index	= layer_data[i2]
+			var rot		= layer_data[i2+1]
+			var scl		= layer_data[i2+2]
+			var y		= layer_data[i2+3]
+			i2 += 4
+			var basis = mat[index].basis.scaled(Vector3(scl,scl,scl)).rotated(Vector3(0,1,0),rot)
+			var v = mat[index].origin
+			var tr = Transform(basis,Vector3(v.x,y,v.z))
+			multimesh.set_instance_transform(ic,tr)
+			ic += 1
+		multimesh.generate_aabb()
+		add_child(multimesh_i)
+	
+
+
