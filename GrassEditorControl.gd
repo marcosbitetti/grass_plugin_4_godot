@@ -16,6 +16,7 @@
 tool
 extends VBoxContainer
 
+# main variables
 var _is_mouse_pressed = false
 var _pencil = false
 var mouse_pos = Vector2()
@@ -28,6 +29,9 @@ var undo_redo
 var template_code = []
 var icon
 
+
+###
+# Control for each layer in panel
 class GrassLayerData extends VBoxContainer:
 	
 	var material
@@ -161,7 +165,8 @@ class GrassLayerData extends VBoxContainer:
 	func _init(link):
 		self.ref = link
 
-
+###
+# Manage a grass node
 class GrassNode extends Spatial:
 	
 	var grass_list = []
@@ -181,12 +186,16 @@ class GrassNode extends Spatial:
 		var aabb = get_parent().get_aabb()
 		instance.set_draw_range_begin( get_parent().get_draw_range_begin() )
 		instance.set_draw_range_end( get_parent().get_draw_range_end() )
-		mesh.set_aabb(aabb)
-		#mesh.generate_aabb()
 		instance.set_multimesh(mesh)
-		add_child(instance)
-		
+		mesh.set_aabb(aabb)
 		mesh.set_mesh(static_mesh)
+		add_child(instance)
+		setup_layer(mesh)
+		
+		var g = GrassLayerData.new(instance)
+		layer_panel.add_child(g)
+	
+	func setup_layer(mesh):
 		mesh.set_instance_count(divisions.x*divisions.y)
 		var i = 0
 		for z in range(divisions.y):
@@ -196,10 +205,7 @@ class GrassNode extends Spatial:
 				#tr.origin = Vector3(rand_range(-10,10),1,rand_range(-10,10))
 				mesh.set_instance_transform(i,tr)
 				i += 1
-		#if _layer_data_class!=null:
-		var g = GrassLayerData.new(instance)
-		layer_panel.add_child(g)
-	
+		
 	func get_layers_handlers():
 		while layer_panel.get_child_count():
 			var c = layer_panel.get_child(0)
@@ -273,8 +279,8 @@ func create_grass_container(parent):
 # ui
 
 
-
-var spin = SpinBox.new()
+# ui variables
+var spin = SpinBox.new() # poor name for grass element distance
 var add_control = Button.new()
 var sizer = HSlider.new()
 var sizer_label = Label.new()
@@ -288,7 +294,10 @@ var layers_panel = VBoxContainer.new()
 var main_controls = VBoxContainer.new()
 var foliage_meshes = OptionButton.new()
 var clean_threshold = SpinBox.new()
+var tree_elements_dialog
+var tree_elements_view = Tree.new()
 
+# mount entire window
 func mount_window():
 	set_v_size_flags(SIZE_EXPAND_FILL)
 	set_h_size_flags(SIZE_FILL)
@@ -336,6 +345,7 @@ func mount_window():
 	spin.set_min(0.05)
 	spin.set_max(10)
 	spin.set_end(Vector2(0,0))
+	spin.connect("value_changed",self,'elements_distance_changed')
 	main_controls.add_child(spin)
 	
 	var divider = HSeparator.new()
@@ -461,10 +471,6 @@ func foliage_mesh_selected(id):
 	foliage_meshes.get_selected_metadata().get_node('_grass').get_layers_handlers()
 	selected_grass_mesh = foliage_meshes.get_selected_metadata().get_node('_grass')
 
-
-var tree_elements_dialog
-var tree_elements_view = Tree.new()
-
 func add_foliage_control():
 	if tree_elements_dialog==null:
 		var d = WindowDialog.new()
@@ -577,6 +583,16 @@ func transverse_nodes(node,level):
 	for nd in get_children():
 		data += transverse_nodes(nd,level + 1)
 	return data
+
+func elements_distance_changed(val):
+	if not selected_grass_mesh:
+		return
+	
+	setup_layers(selected_grass_mesh)
+	for inst in selected_grass_mesh.get_children():
+		var mesh = inst.get_multimesh()
+		selected_grass_mesh.setup_layer(mesh)
+
 
 func clean_layers():
 	if selected_grass_mesh:
@@ -769,7 +785,7 @@ func pencil_action(grass,result,space_state,delta):
 				var mesh = grass.get_children()[grass.layer_index].get_multimesh()
 				var tr = mesh.get_instance_transform(i)
 				var s = 1.0 / d*d
-				s = s * (max_scale.get_value() - tr.basis.get_scale().x) * strength.get_value() * delta
+				s = s * (max_scale.get_value() - tr.basis.get_scale().x) * strength.get_value() * 1.5 * delta
 				if decreaser.is_pressed():
 					s = tr.basis.get_scale().x - s
 				else:
