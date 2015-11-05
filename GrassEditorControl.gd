@@ -23,12 +23,12 @@ var mouse_pos = Vector2()
 var camera_data = []
 var selected_viewport
 var viewport_offset = Vector2()
+var selected_editor_control
 var default_mesh
 var selected_grass_mesh
 var undo_redo
 var template_code = []
 var icon
-
 
 ###
 # Control for each layer in panel
@@ -206,6 +206,7 @@ class GrassNode extends Spatial:
 				mesh.set_instance_transform(i,tr)
 				i += 1
 		
+	
 	func get_layers_handlers():
 		while layer_panel.get_child_count():
 			var c = layer_panel.get_child(0)
@@ -230,7 +231,7 @@ class GrassNode extends Spatial:
 #	 z  ->	x	->	transform
 func setup_layers(grassNode):
 	var aabb = grassNode.get_parent().get_aabb()
-	var dist = aabb.size / spin.get_value()
+	var dist = aabb.size / element_step.get_value()
 	var mt = Array()
 	var zz = aabb.pos.z
 	for z in range(ceil(dist.z)):
@@ -238,15 +239,18 @@ func setup_layers(grassNode):
 		var xx = aabb.pos.x
 		for x in range(ceil(dist.x)):
 			var dt = Transform()
-			dt.origin = Vector3(xx,0,zz)
+			# random X Z
+			var rx = rand_range(-0.98,0.98) * element_step.get_value()
+			var rz = rand_range(-0.98,0.98) * element_step.get_value()
+			dt.origin = Vector3(xx+rx,0,zz+rz)
 			#dt.basis = dt.basis.scaled(Vector3(0,0,0))
 			dt.basis = dt.basis.rotated(Vector3(0,1,0), rand_range(-PI,PI))
 			lin.push_back(dt)
-			xx += spin.get_value()
+			xx += element_step.get_value()
 		mt.push_back(lin)
-		zz += spin.get_value()
+		zz += element_step.get_value()
 	grassNode.matrix = mt
-	grassNode.dist = Vector2(spin.get_value(),spin.get_value())
+	grassNode.dist = Vector2(element_step.get_value(),element_step.get_value())
 	grassNode.divisions = Vector2(ceil(dist.x),ceil(dist.z))
 	grassNode.height = aabb.size.y
 	grassNode.begin = aabb.pos
@@ -280,7 +284,7 @@ func create_grass_container(parent):
 
 
 # ui variables
-var spin = SpinBox.new() # poor name for grass element distance
+var element_step = SpinBox.new()
 var add_control = Button.new()
 var sizer = HSlider.new()
 var sizer_label = Label.new()
@@ -294,8 +298,6 @@ var layers_panel = VBoxContainer.new()
 var main_controls = VBoxContainer.new()
 var foliage_meshes = OptionButton.new()
 var clean_threshold = SpinBox.new()
-var tree_elements_dialog
-var tree_elements_view = Tree.new()
 
 # mount entire window
 func mount_window():
@@ -338,15 +340,15 @@ func mount_window():
 	label.set_text(tr('elements distance'))
 	main_controls.add_child(label)
 	
-	spin.set_value(0.5)
-	spin.set_editable(true)
-	spin.set_rounded_values(false)
-	spin.set_step(0.25)
-	spin.set_min(0.05)
-	spin.set_max(10)
-	spin.set_end(Vector2(0,0))
-	spin.connect("value_changed",self,'elements_distance_changed')
-	main_controls.add_child(spin)
+	element_step.set_value(0.5)
+	element_step.set_editable(true)
+	element_step.set_rounded_values(false)
+	element_step.set_step(0.25)
+	element_step.set_min(0.05)
+	element_step.set_max(10)
+	element_step.set_end(Vector2(0,0))
+	element_step.connect("value_changed",self,'elements_distance_changed')
+	main_controls.add_child(element_step)
 	
 	var divider = HSeparator.new()
 	main_controls.add_child(divider)
@@ -470,6 +472,10 @@ func foliage_mesh_selected(id):
 	#printt( 'meta',foliage_meshes.get_selected_metadata() )
 	foliage_meshes.get_selected_metadata().get_node('_grass').get_layers_handlers()
 	selected_grass_mesh = foliage_meshes.get_selected_metadata().get_node('_grass')
+
+
+var tree_elements_dialog
+var tree_elements_view = Tree.new()
 
 func add_foliage_control():
 	if tree_elements_dialog==null:
@@ -663,7 +669,8 @@ func make_code(node, grass_data, grass_step, mesh_list, material_list):
 	script.set_source_code(code)
 	return script
 	
-
+###
+# Clean up an mesh grass
 func clean_grass(grass):
 	var index = 0 # index of tested instance
 	for z_lin in grass.matrix:
@@ -724,7 +731,9 @@ func make_grass_to_game():
 							data_array += str(i2) + ','
 							data_array += str(basis.get_euler().y) + ','
 							data_array += str(basis.get_scale().y) + ','
+							data_array += str(inst.get_multimesh().get_instance_transform(i2).origin.x) + ','
 							data_array += str(inst.get_multimesh().get_instance_transform(i2).origin.y) + ','
+							data_array += str(inst.get_multimesh().get_instance_transform(i2).origin.z) + ','
 				else:
 					data_array += "\t[,"
 				data_array = data_array.substr(0,data_array.length()-1) + "],\n"
@@ -735,7 +744,7 @@ func make_grass_to_game():
 			
 			var g_node = Spatial.new()
 			g_node.set_name('_grass')
-			g_node.set_script( make_code(g_node, data_array, str(spin.get_value()), mesh_layers,material_layers) )
+			g_node.set_script( make_code(g_node, data_array, str(element_step.get_value()), mesh_layers,material_layers) )
 			
 			foliage_meshes.get_item_metadata(i).add_child(g_node)
 			var root = get_tree().get_edited_scene_root()
@@ -758,7 +767,7 @@ func pencil_action(grass,result,space_state,delta):
 	var pos = result.collider.get_global_transform().xform_inv(result.position) - grass.begin
 	#print(result.collider.get_global_transform().xform(pos+grass.begin), ' e ', result.position)
 	var coord = Vector3( floor(pos.x/grass.dist.x), pos.y, floor(pos.z/grass.dist.y) )
-	var amount = ceil(sizer.get_value()/spin.get_value())
+	var amount = 1 + ceil(sizer.get_value()/element_step.get_value())
 	var aabb = [coord.x-amount,coord.z-amount,coord.x+amount,coord.z+amount]
 	if aabb[0]<0:
 		aabb[0]=0
@@ -802,53 +811,76 @@ func pencil_action(grass,result,space_state,delta):
 					var pt = result.collider.get_global_transform().origin + result.collider.get_global_transform().basis.xform(p)
 					var r = space_state.intersect_ray( Vector3(pt.x,lim_up,pt.z),Vector3(pt.x,lim_dow,pt.z) )
 					if not result.empty() and r.has('position'):
-						tr.origin.y = r.position.y
+						tr.origin.y = r.position.y - result.collider.get_global_transform().origin.y
 					#print(r)
 				mesh.set_instance_transform(i,tr)
-				mesh.generate_aabb()
+				grass_to_recalcule = mesh
 				#print(tr)
 			#printt(d,p,coord,pos)
 
 # this restrict paint to solve performance issues
 var pencil_delay = 0
+var grass_to_recalcule = null
 
 func _fixed_process(delta):
 	if selected_viewport==null:
 		return
-
+	
+	var main_vp = selected_viewport # get_tree().get_current_scene().get_viewport()
+	var space_state
+	if main_vp.get_world():
+		space_state = main_vp.get_world().get_direct_space_state()
+	else:
+		space_state = get_tree().get_edited_scene_root().get_world().get_direct_space_state()
+	
+	var camera = main_vp.get_camera()
+	var from = camera.project_ray_origin(mouse_pos-viewport_offset)
+	var to = from + camera.project_ray_normal(mouse_pos-viewport_offset) * 100000
+	var result = space_state.intersect_ray( from,to )
+	
+	# draw pencil
+	if not result.empty():
+		#var d_pos = camera.unproject_position(result.position)
+		#printt(d_pos)
+		#print(selected_editor_control)
+		selected_editor_control.show_pencil(result.position, camera, null, sizer.get_value())
+		#if not result.empty():
+		#	var parent = result.collider.get_parent()
+		#	var grass = parent.get_node('_grass')
+		#	if grass:
+		#		
+	
 	if _pencil:
 		pencil_delay += delta
 		if pencil_delay<0.023:
 			return
-			
-		pencil_delay = 0
-		var main_vp = selected_viewport # get_tree().get_current_scene().get_viewport()
-		var space_state
-		if main_vp.get_world():
-			space_state = main_vp.get_world().get_direct_space_state()
-		else:
-			space_state = get_tree().get_edited_scene_root().get_world().get_direct_space_state()
-		var camera = main_vp.get_camera()
-		var from = camera.project_ray_origin(mouse_pos-viewport_offset)
-		var to = from + camera.project_ray_normal(mouse_pos-viewport_offset) * 100000
-		var result = space_state.intersect_ray( from,to )
+		
 		#printt(mouse_pos,from,to)
-		if (not result.empty()):
+		if not result.empty():
 			var parent = result.collider.get_parent()
 			var grass = parent.get_node('_grass')
 			if grass != null:
 				#grass = parent.get_node('_grass')
-				pencil_action(grass,result,space_state,delta)
+				pencil_action(grass,result,space_state,pencil_delay)
 			#var cord = Vector3( floor(pos.x/grass.dist.x), pos.y, floor(pos.z/grass.dist.y) )
 			# print(grass.matrix[cord.z][cord.x])
 			#print("Hit at point: ",result.collider)
+		pencil_delay = 0
 
 func _input(event):
+	if event.type == InputEvent.MOUSE_MOTION:
+		for c in camera_data:
+			if c.has_point(event.global_pos):
+				selected_viewport = c.viewport
+				selected_editor_control = c.shape
+				viewport_offset = c.control.get_global_pos()
+				mouse_pos = event.pos
 	if event.type == InputEvent.MOUSE_BUTTON:
 		if event.button_index==2 and event.is_pressed():
 			for c in camera_data:
 				if c.has_point(event.global_pos):
 					selected_viewport = c.viewport
+					selected_editor_control = c.shape
 					viewport_offset = c.control.get_global_pos()
 					_is_mouse_pressed = event.is_pressed() #not _is_mouse_pressed
 					mouse_pos = event.pos
@@ -857,11 +889,15 @@ func _input(event):
 		if not event.is_pressed():
 			_pencil = false
 			selected_viewport = null
+			_is_mouse_pressed = false
+			if grass_to_recalcule:
+				grass_to_recalcule.generate_aabb()
+				grass_to_recalcule = null
 			
 			#print(event.meta)
 	if event.type == InputEvent.MOUSE_MOTION and _is_mouse_pressed:
 		#print('dragando ', event.pos)
-		mouse_pos = event.pos
+		#mouse_pos = event.pos
 		_pencil = true
 	
 
@@ -875,13 +911,6 @@ func _ready():
 	mount_window()
 	set_fixed_process(true)
 	set_process_input(true)
-	
-	#print( 'transverse', transverse_nodes( get_node('/root'), 0 ) )
-	#var f = File.new()
-	#f.open("user://data.txt", File.WRITE)
-	#f.store_string( transverse_nodes( get_node('/root'), 0 ) )
-	#f.close()
-	#print('donead')
 
 func _init(_camera_data, _def_mesh, _tc, _ico):
 	self.camera_data = _camera_data

@@ -16,7 +16,7 @@
 tool
 extends EditorPlugin
 
-# to execute ./godot.x11.tools.64 -e -path ../../../godot/grass_editor_2
+# to execute in dev machine ./godot.x11.tools.64 -e -path ../../../godot/grass_editor_2
 
 const GrassEditorControl = preload("GrassEditorControl.gd")
 const default_plant1 = preload('resources/plant1.tex')
@@ -88,6 +88,33 @@ func make_default_mesh():
 	return default_mesh
 
 
+####
+# Pencil to draw
+#
+class Pencil extends Control:
+	
+	var mouse = Vector2()
+	var _size = 1
+	var _pos
+	var _cam
+	var _offset_control = null
+	
+	func show_pencil(pos, camera, transform,size):
+		mouse = camera.unproject_position(pos)
+		_size = mouse.distance_to( camera.unproject_position(pos+Vector3(size,0,0) ) )
+		_cam = camera
+		_pos = pos
+		update()
+	
+	func _draw():
+		if not _offset_control:
+			return
+		draw_set_transform(mouse + _offset_control.get_global_pos(), 0, Vector2(1,1))
+		draw_circle(Vector2(0,0), _size, Color(1,1,1,0.05))
+	
+	func _init():
+		pass
+
 
 ######
 # CameraData is a data container to store Editor UI data
@@ -101,6 +128,7 @@ func make_default_mesh():
 class CameraData:
 	var control
 	var viewport
+	var shape = Pencil.new()
 
 	# point is inside this view]?
 	func has_point(v):
@@ -110,6 +138,11 @@ class CameraData:
 	func _init(ct,vp):
 		self.viewport = vp
 		self.control = ct
+		self.shape.set_as_toplevel(true)
+		self.shape.set_process_unhandled_input(false)
+		self.shape.set_ignore_mouse(true)
+		self.shape._offset_control = ct
+		ct.add_child(self.shape)
 
 
 func get_path_dir():
@@ -184,3 +217,6 @@ func _exit_tree():
 	#grass_editor.queue_free()
 	grass_editor = null
 	
+	#pencils
+	for c in camera_data:
+		c.shape.queue_free()

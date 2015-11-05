@@ -1,4 +1,4 @@
-#!grass_plugin v1.0.0
+#!grass_plugin v1.0.1
 ##################################################################################
 # file: {%file_name}                                                             #
 ##################################################################################
@@ -88,8 +88,10 @@ func _ready():
 			var index	= layer_data[i2]
 			var rot		= layer_data[i2+1]
 			var scl		= layer_data[i2+2]
-			var y		= layer_data[i2+3]
-			i2 += 4
+			var x		= layer_data[i2+3]
+			var y		= layer_data[i2+4]
+			var z		= layer_data[i2+5]
+			i2 += 6
 			var basis = mat[index].basis.scaled(Vector3(scl,scl,scl)).rotated(Vector3(0,1,0),rot)
 			var v = mat[index].origin
 			var tr = Transform(basis,Vector3(v.x,y,v.z))
