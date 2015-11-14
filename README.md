@@ -4,7 +4,9 @@
 
 A plugin to handle huge amount of grass, foliages and other vegetations for <a href="http://www.godotengine.org/projects/godot-engine" target="_blank">Godot Game Engine</a>.
 
-Any mesh can be attached to a static body.
+It works in any mesh attached to a static body.
+
+Save his content as a script inside your scene. And can edit it after.
 
 ## Intalation and tutorial
 

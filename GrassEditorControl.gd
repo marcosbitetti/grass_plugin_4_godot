@@ -102,6 +102,12 @@ class GrassLayerData extends VBoxContainer:
 		parent.get_layers_handlers()
 		self.queue_free()
 	
+	func show_hide_layer(value):
+		if value:
+			ref.show()
+		else:
+			ref.hide()
+	
 	func _ready():
 		set_h_size_flags(SIZE_EXPAND_FILL)
 		
@@ -109,14 +115,29 @@ class GrassLayerData extends VBoxContainer:
 		var lbl = Label.new()
 		var bt = Button.new()
 		var chk = CheckBox.new()
+		var visible_chk = CheckBox.new()
 		
 		chk.connect("pressed",self,"active_this_layer")
 		chk.set_h_size_flags(SIZE_EXPAND_FILL)
 		chk.set_tooltip(tr('Set active layer'))
-		chk.set_text( tr('Layer ') + str( self.get_index() ) )
+		#chk.set_text( tr('Layer ') + str( self.get_index() ) )
 		if self.ref.get_parent().layer_index == self.get_index():
 			chk.set_pressed(true)
 		hbox.add_child(chk)
+		
+		visible_chk.set_h_size_flags(SIZE_EXPAND_FILL)
+		visible_chk.set_tooltip(tr('Layer visibility'))
+		if ref.is_visible():
+			visible_chk.set_pressed(true)
+		else:
+			visible_chk.set_pressed(false)
+		visible_chk.connect("toggled", self, 'show_hide_layer')
+		hbox.add_child(visible_chk)
+		
+		lbl.set_h_size_flags(SIZE_EXPAND_FILL)
+		lbl.set_text( tr('Layer ') + str( self.get_index() ) )
+		hbox.add_child(lbl)
+		
 		bt.set_text('X')
 		bt.set_tooltip(tr('Remove Layer'))
 		bt.connect("pressed",self,'remove_layer')
@@ -177,8 +198,8 @@ class GrassNode extends Spatial:
 	var begin = Vector3()
 	var layer_index = 0
 	var layer_panel
-	# strange soluction to contour capsole of class
-	#var _layer_data_class
+	var is_grass = true # this is used in editor to prevent click in not editable grass
+	
 	
 	func add_layer(static_mesh):
 		var instance = MultiMeshInstance.new()
@@ -215,6 +236,83 @@ class GrassNode extends Spatial:
 		for lay in self.get_children():
 			var g = GrassLayerData.new(lay) #class_ref.new(lay)
 			layer_panel.add_child(g)
+	
+	###
+	# This read a old source code and parse it on a new worker data
+	# to prevent issues the version control in beggining of script
+	# is used.
+	func convert_code_to_data(data):
+		var ini = data.find('!grass_plugin ') + 14
+		var version = data.substr( ini, data.find("\n") - ini)
+		var int_version = int( version.substr(1,version.length()-1).replace('.','') )
+		
+		# no work in versions before 1.0.2
+		if int_version<102:
+			return
+		
+		ini = data.find('var grass_step = ') + 17
+		var step = float( data.substr(ini, data.find("\n",ini)-ini) )
+		
+		ini = data.find('var mesh_layers_data = [') + 24
+		var mesh_layers_data_arr = data.substr(ini, data.find("]",ini)-ini).split(',')
+		
+		ini = data.find('var material_layers_data = [') + 28
+		var material_layers_data_arr = data.substr(ini, data.find("]",ini)-ini).split(',')
+		
+		# brute data from layers
+		ini = data.find("var data = [\n") + 13
+		var limit = 500
+		var index = 0
+		while true:
+			var end = data.find("\n",ini)
+			var lin = data.substr(ini,end-ini)
+			ini = end + 1
+			if lin.find(']')==0: # last line reached
+				break
+			else:
+				# setup layer data
+				var instance = get_child(index)
+				
+				var mesh = ResourceLoader.load( mesh_layers_data_arr[index].substr(1,mesh_layers_data_arr[index].length()-2), 'Mesh')
+				instance.get_multimesh().set_mesh( mesh )
+				
+				var mt = material_layers_data_arr[index].substr(1,material_layers_data_arr[index].length()-2)
+				if not mt.empty():
+					var mat = ResourceLoader.load(mt,"Material")
+					instance.set_material_override( mat )
+				lin = lin.strip_edges()
+				lin = lin.substr(1,lin.length()-2)
+				var nums = lin.split(',')
+				var i = 0
+				while i<nums.size():
+					var ind = int(nums[i])
+					var rot = float(nums[i+1])
+					var scl = float(nums[i+2])
+					var x = float(nums[i+3])
+					var y = float(nums[i+4])
+					var z = float(nums[i+5])
+					var zm = int( floor(ind / divisions.x) )
+					var xm = ind - zm*divisions.x
+					
+					var dt = Transform()
+					dt.origin = Vector3(x,y,z)
+					dt.basis = dt.basis.rotated(Vector3(0,1,0), rot)
+					matrix[zm][xm] = dt
+					
+					dt = Transform()
+					dt.origin = Vector3(x,y,z)
+					dt.basis = dt.basis.scaled(Vector3(scl,scl,scl)).rotated(Vector3(0,1,0), rot)
+					instance.get_multimesh().set_instance_transform( ind, dt )
+					
+					i += 6
+				
+				
+				index += 1
+			
+			# security is very good
+			limit -= 1
+			if limit<1:
+				break
 	
 	func _init(panel):
 		self.layer_panel = panel
@@ -258,7 +356,7 @@ func setup_layers(grassNode):
 
 ###
 # Add a spatial to create grass layers
-func create_grass_container(parent):
+func create_grass_container(parent, layers_count = 1):
 	if not parent.is_type('MeshInstance'):
 		return false
 	
@@ -272,7 +370,8 @@ func create_grass_container(parent):
 	#var l1  = MultiMeshInstance.new()
 	cont.grass_list = Array()
 	setup_layers(cont)
-	cont.add_layer(default_mesh)
+	for i in range(layers_count):
+		cont.add_layer(default_mesh)
 	cont.get_layers_handlers()
 	selected_grass_mesh = cont
 	return true
@@ -497,6 +596,11 @@ func add_foliage_control():
 		tree.connect("item_activated",self,"select_tree_element")
 		cont.add_child(tree)
 		
+		var warning = Label.new()
+		warning.set_h_size_flags(SIZE_EXPAND_FILL)
+		warning.set_text(tr('(*) Items marked to convert to editable, will be lost final data and need be save again.'))
+		cont.add_child(warning)
+		
 		var h = HBoxContainer.new()
 		h.set_h_size_flags(SIZE_EXPAND_FILL)
 		
@@ -526,34 +630,69 @@ func add_foliage_control():
 	
 	tree_elements_dialog.popup_centered()
 
+
 func parse_selection_tree(node,tree):
 	if node.is_type('MeshInstance'):
 		var ok = false
+		var exists = false
 		for nd in node.get_children():
 			if nd.is_type('StaticBody'):
 				ok = true
 			if nd.get_name()=='_grass':
-				ok = false
-				break
+				# if already exists a _grass
+				if ok:
+					ok = false
+					exists = false
+					if nd.get_script().has_source_code():
+						if nd.get_script().get_source_code().length()>0:
+							ok = true
+							exists = true
+				#ok = false
+				#break
 		if ok:
+			var name = node.get_name()
 			var item = tree.create_item(tree.get_root())
-			item.set_text(0,node.get_name())
+			if exists:
+				name += tr(' [convert to editable (*)]')
+			item.set_text(0,name)
 			item.set_metadata(0,node )
 			
 		return
 	for nd in node.get_children():
 		parse_selection_tree(nd,tree)
 
+# select a tree element, and check if already exist a _grass node inside
+# in positive case, call the convertion function
 func select_tree_element():
+	var previus_data = ''
+	var layers_count = 1
 	var item =  tree_elements_view.get_selected()
+	
 	if item != null:
-		create_grass_container( item.get_metadata(0) )
+		if item.get_metadata(0).get_node('_grass') != null:
+			var nd = item.get_metadata(0).get_node('_grass')
+			nd.set_name('_grass.removed')
+			previus_data = nd.get_script().get_source_code()
+			layers_count = nd.get_child_count()
+			nd.get_parent().remove_child(nd)
+			nd.queue_free()
+			if layers_count<1:
+				layers_count = 1
+			
+		create_grass_container( item.get_metadata(0), layers_count )
 		foliage_meshes.add_item(item.get_metadata(0).get_name())
 		foliage_meshes.set_item_metadata(foliage_meshes.get_item_count()-1,item.get_metadata(0))
 		foliage_meshes.select(foliage_meshes.get_item_count()-1)
 		foliage_mesh_selected(foliage_meshes.get_item_count()-1)
+		
+		# if previs data exists
+		if not previus_data.empty():
+			item.get_metadata(0).get_node('_grass').convert_code_to_data(previus_data)
+		
+		# show layer handlers
 		item.get_metadata(0).get_node('_grass').get_layers_handlers()
 		main_controls.show()
+		
 	tree_elements_dialog.hide()
 	
 func add_new_layer():
@@ -861,7 +1000,8 @@ func _fixed_process(delta):
 			var grass = parent.get_node('_grass')
 			if grass != null:
 				#grass = parent.get_node('_grass')
-				pencil_action(grass,result,space_state,pencil_delay)
+				if grass.get('is_grass'):
+					pencil_action(grass,result,space_state,pencil_delay)
 			#var cord = Vector3( floor(pos.x/grass.dist.x), pos.y, floor(pos.z/grass.dist.y) )
 			# print(grass.matrix[cord.z][cord.x])
 			#print("Hit at point: ",result.collider)

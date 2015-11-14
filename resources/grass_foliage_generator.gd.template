@@ -1,4 +1,4 @@
-#!grass_plugin v1.0.1
+#!grass_plugin v1.0.2
 ##################################################################################
 # file: {%file_name}                                                             #
 ##################################################################################
@@ -63,7 +63,10 @@ func setup_resources():
 	for m in mesh_layers_data:
 		mesh_layers.push_back( ResourceLoader.load(m,'Mesh') )
 	for m in material_layers_data:
-		material_layers.push_back( ResourceLoader.load(m,'Material') )
+		if not m.empty():
+			material_layers.push_back( ResourceLoader.load(m,'Material') )
+		else:
+			material_layers.push_back( false )
 
 # mound the entire scene
 func _ready():
@@ -75,13 +78,14 @@ func _ready():
 		var multimesh = MultiMesh.new()
 		multimesh.set_mesh( mesh_layers[i] )
 		multimesh_i.set_multimesh(multimesh)
-		multimesh_i.set_material_override( material_layers[i] )
+		if material_layers[i]:
+			multimesh_i.set_material_override( material_layers[i] )
 		multimesh_i.set_flag(GeometryInstance.FLAG_CAST_SHADOW,false)
 		multimesh_i.set_flag(GeometryInstance.FLAG_RECEIVE_SHADOWS,false)
 		multimesh_i.set_draw_range_begin(get_parent().get_draw_range_begin())
 		multimesh_i.set_draw_range_end(get_parent().get_draw_range_end())
 		var layer_data = data[i]
-		multimesh.set_instance_count( ceil(layer_data.size()/4) )
+		multimesh.set_instance_count( ceil(layer_data.size()/6) )
 		var i2 = 0
 		var ic = 0
 		while i2<layer_data.size():
@@ -94,7 +98,7 @@ func _ready():
 			i2 += 6
 			var basis = mat[index].basis.scaled(Vector3(scl,scl,scl)).rotated(Vector3(0,1,0),rot)
 			var v = mat[index].origin
-			var tr = Transform(basis,Vector3(v.x,y,v.z))
+			var tr = Transform(basis,Vector3(x,y,z))
 			multimesh.set_instance_transform(ic,tr)
 			ic += 1
 		multimesh.generate_aabb()
