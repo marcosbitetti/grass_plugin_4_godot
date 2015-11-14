@@ -970,7 +970,10 @@ func _fixed_process(delta):
 	if main_vp.get_world():
 		space_state = main_vp.get_world().get_direct_space_state()
 	else:
-		space_state = get_tree().get_edited_scene_root().get_world().get_direct_space_state()
+		if get_tree().get_edited_scene_root() == null:
+			return
+		else:
+			space_state = get_tree().get_edited_scene_root().get_world().get_direct_space_state()
 	
 	var camera = main_vp.get_camera()
 	var from = camera.project_ray_origin(mouse_pos-viewport_offset)
