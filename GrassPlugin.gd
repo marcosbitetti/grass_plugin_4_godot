@@ -22,7 +22,6 @@ const GrassEditorControl = preload("GrassEditorControl.gd")
 const default_plant1 = preload('resources/plant1.tex')
 const default_plant1n = preload('resources/plant1n.tex')
 const icon = preload('ico.png')
-
 var default_mesh
 
 var grass_editor
@@ -148,15 +147,19 @@ class CameraData:
 func get_path_dir():
 	var path
 	# X11 and OSX
-	if OS.has_environment('HOME'):
-		path = OS.get_environment('HOME').plus_file('.godot')
+	#if OS.has_environment('HOME'):
+	#	path = OS.get_environment('HOME').plus_file('.godot')
 	# Windows
-	elif OS.has_environment('APPDATA'):
-		path = OS.get_environment('APPDATA').plus_file('Godot')
-	else:
-		path = './'
+	#elif OS.has_environment('APPDATA'):
+	#	path = OS.get_environment('APPDATA').plus_file('Godot')
+	#else:
+	#	path = './'
+
+	path = icon.get_path()
+	path = path.substr(0,path.find('ico.png')-1)
 	
-	return path.plus_file('plugins/grass_editor/resources')
+	return "".plus_file( path + '/resources')
+	#return path.plus_file('plugins/grass_editor/resources')
 
 var camera_data = []
 var template_code = []
@@ -194,6 +197,7 @@ func _enter_tree():
 	# load template
 	if template_code.size()==0:
 		var path = get_path_dir()
+		print('TEMP ', path)
 		var tmp_file = File.new()
 		tmp_file.open(path.plus_file('grass_foliage_generator.gd.template'), File.READ)
 		while not tmp_file.eof_reached():

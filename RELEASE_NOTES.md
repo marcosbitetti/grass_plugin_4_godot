@@ -1,3 +1,6 @@
+# v 1.0.3
+* fixed terrible bug that make editor crash in a infinite loop.
+
 # v 1.0.2
 
 * FINALY the option to OPEN/convert a finalized grass layer to edition again
