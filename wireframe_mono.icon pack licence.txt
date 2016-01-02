@@ -1,0 +1,3 @@
+Icon Pack	: Wireframe Mono
+Designer	: Gentleface.com
+License		: Creative Commons Attribution Non-commercial (by-nc)

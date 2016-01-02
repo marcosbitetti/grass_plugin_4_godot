@@ -1,3 +1,26 @@
+# v 1.1.0
+
+Much, much, muuuch changes! Older releases as zipped into projects folder.
+
+* Included a example project in folder
+* Now it is capable to split the surface into thin surfaces, to increase performance and use view range;
+* More faster to edit;
+* Added Edity Only mode to pencil;
+* Added Min Scale spinner to control initial scale of elements;
+* Layers now use more usability with icons;
+* Layers can be named;
+* New dialog to setup layers;
+* Layers can use multiple meshes to different view ranges;
+* A preview dialog was made to select meshes;
+* A new tool to randomize visible layers, with a option on layer dialogs to specify the ratio of occurrence of layer element;
+* Code is now divided into separated file classes;
+* More complex data structure;
+* Extensible use of dictionaries;
+* Clean up unused code (yes, I forgot it);
+* Use of constants instead real values;
+* Bugfixes with the actual Editor's structure
+* Store edit data into local developer projects folder
+
 # v 1.0.3
 * fixed terrible bug that make editor crash in a infinite loop.
 

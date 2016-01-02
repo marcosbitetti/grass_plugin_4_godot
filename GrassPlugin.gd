@@ -166,9 +166,34 @@ var template_code = []
 
 ####
 # Find cameras from Viewports and store it in a array with custo dara
-#
+# The form of Editor's envoronment appears like it:
+#		root:
+#			EditorNode:
+#				@EditorFileSystem2:
+#				@EditorImportExport3:
+#				@Panel4:
+#					@VBoxContainer8:
+#						@HSplitContainer13:
+#							@HSplitContainer17:
+#								@HSplitContainer21:
+#									@VSplitContainer22:
+#										@VSplitContainer38:
+#											@VBoxContainer39:
+#												@Panel44:
+#													@Control46:
+#														@SpatialEditor7529:
+#															@HSplitContainer7387:
+#																@VSplitContainer7388:
+#																	@Control7389:
+#																		@SpatialEditorViewport7398:
+#																			@Control7390:
+#																				@Viewport7391:
+#																					@Camera7393:
+# then our code find this structure from viewport
 func find_cameras(node,lvl):
-	if node.get_name().find('@SpatialEditorViewport') > -1:
+	# after revision 9251298f46537cde669e66ed740c9987678c4617 from 12/2015 somethings changed, the second condition
+	# from this IF solve this problem.
+	if node.get_name().find('@SpatialEditorViewport') > -1 or node.get_type().find('SpatialEditorViewport') > -1:
 		#print('camera !')
 		#printt('position',node.get_child(0).get_global_pos())
 		#printt('size    ',node.get_child(0).get_size())
@@ -179,6 +204,21 @@ func find_cameras(node,lvl):
 		return
 	for nd in node.get_children():
 		find_cameras(nd,lvl)
+
+
+####
+# helper function
+#
+func _tree_to_string(node,lvl):
+	var ident = ''
+	for i in range(lvl):
+		ident += "\t"
+	var s = ident + node.get_name() + ':' + node.get_type() + "\n"
+	for child in node.get_children():
+		s += _tree_to_string(child,lvl+1)
+
+	return s
+
 
 
 static func get_name():
@@ -209,6 +249,15 @@ func _enter_tree():
 	grass_editor = GrassEditorControl.new( camera_data, make_default_mesh(), template_code, icon)
 	grass_editor.undo_redo = get_undo_redo()
 	add_custom_control(CONTAINER_SPATIAL_EDITOR_SIDE, grass_editor)
+
+	# Do not disomment it if you no need study the editor.
+	# This is a routine to examinate the Editor's structure
+	# to help in future editor changes
+	#var content = _tree_to_string(get_node("/root/EditorNode"),0)
+	#var file = File.new()
+	#file.open('user://editor.struct.txt',File.WRITE)
+	#file.store_string(content)
+	#file.close()
 
 	
 	print("Grass Editor Plugin - loaded")

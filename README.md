@@ -8,6 +8,9 @@ It works in any mesh attached to a static body.
 
 Save his content as a script inside your scene. And can edit it after.
 
+## Sample scene
+<a href="https://github.com/marcosbitetti/grass_plugin_4_godot/tree/master/example">Example scene</a>.
+
 ## Intalation and tutorial
 
 See here the <a href="https://www.youtube.com/watch?v=-lxk_bLRBSg" target="_blank">tutorial in YouTube</a> to installtion and usage. (Remember: activate de subtitles)
