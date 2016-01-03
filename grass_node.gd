@@ -189,6 +189,7 @@ func convert_code_to_data(data):
 	
 	ini = data.find('var grass_step = ') + 17
 	var step = float( data.substr(ini, data.find("\n",ini)-ini) )
+	self.dist = Vector2(step,step)
 	
 	ini = data.find('var space_division_size = Vector3(')+34
 	var space_division_size = int( data.substr(ini, data.find(",",ini)-ini) )

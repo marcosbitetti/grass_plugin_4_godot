@@ -66,11 +66,8 @@ func create_grass_container(parent, layers_count = 1):
 	else:
 		cont.set_owner(parent)
 	cont.set_name('_grass')
-	#var l1  = MultiMeshInstance.new()
-	setup_layers(cont)
-	for i in range(layers_count):
-		cont.add_layer(default_mesh)
-	cont.get_layers_handlers()
+	cont.setup(element_step.get_value(),spatial_subdivision_size.get_value())
+	cont.add_layer(default_mesh)
 	selected_grass_mesh = cont
 	return true
 
@@ -469,7 +466,11 @@ func select_tree_element():
 		
 		# if previs data exists
 		if not previus_data.empty():
-			item.get_metadata(0).get_node('_grass').convert_code_to_data(previus_data)
+			var nd = item.get_metadata(0).get_node('_grass')
+			var c = nd.get_child(0)
+			nd.remove_child(c)
+			c.queue_free()
+			nd.convert_code_to_data(previus_data)
 		
 		# show layer handlers
 		item.get_metadata(0).get_node('_grass').get_layers_handlers()
