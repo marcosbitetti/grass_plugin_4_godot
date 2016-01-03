@@ -4,6 +4,8 @@
 
 A plugin to handle huge amount of grass, foliages and other vegetations for <a href="http://www.godotengine.org/projects/godot-engine" target="_blank">Godot Game Engine</a>.
 
+It was tested in an environment with meshes of around 100x100 units of size (as I use on <a href="http://www.wildwitchproject.com/" target="_blank">my game project</a> scenes) and show a good performance.
+
 It works in any mesh attached to a static body.
 
 Save his content as a script inside your scene. And can edit it after.

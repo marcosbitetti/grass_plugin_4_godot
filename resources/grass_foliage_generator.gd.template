@@ -1,4 +1,4 @@
-#!grass_plugin v1.0.2
+#!grass_plugin v1.1.0
 ##################################################################################
 # file: {%file_name}                                                             #
 ##################################################################################
@@ -33,76 +33,97 @@ extends Spatial
 var grass_step = {%grass_step}
 # arrays temporary store data
 var mesh_layers_data = [{%mesh_list}]
-var material_layers_data = [{%material_list}]
-var mesh_layers = []
-var material_layers = []
-# data from grass is array of quarters -> index, rotation, scale, height
-var data = {%data_entry}
+var layer_names = [{%layer_names}]
+var space_division_size = Vector3({%division_size})
+# (only useful in editor)
+# randomization = {%randomization} 
+# {%binary_filename}
 
-# mount base transformations
-func setup_matrix():
-	var aabb = get_parent().get_aabb()
-	var dist = aabb.size / grass_step
-	var mt = Array()
-	var zz = aabb.pos.z
-	for z in range(ceil(dist.z)):
-		#var lin = Array()
-		var xx = aabb.pos.x
-		for x in range(ceil(dist.x)):
-			var dt = Transform()
-			dt.origin = Vector3(xx,0,zz)
-			#lin.push_back(dt)
-			mt.push_back(dt)
-			xx += grass_step
-		#mt.push_back(lin)
-		zz += grass_step
-	return mt
+# data from grass
+var data = [{%data_entry}]
 
-# load resources
-func setup_resources():
-	for m in mesh_layers_data:
-		mesh_layers.push_back( ResourceLoader.load(m,'Mesh') )
-	for m in material_layers_data:
-		if not m.empty():
-			material_layers.push_back( ResourceLoader.load(m,'Material') )
-		else:
-			material_layers.push_back( false )
 
+# this change far and near distances from meshes using offset to
+# change it usin next level. On reach last elements it make hidden
+func performance_change(offset):
+	for layer in mesh_layers_data:
+		# hide unecessary layers levels
+		if offset>0:
+			for lod in range(offset):
+				for i in layer[lod].lods:
+					i.hide()
+		var of = offset
+		var index = 0
+		if of > layer.size():
+			of = layer.size()-of
+			if of<0:
+				of = 0
+		for lod_i in range(of,layer.size()):
+			var lodR = layer[index]
+			var lod = layer[lod_i]
+			if of>= layer.size():
+				for i in lod.lods:
+					i.hide()
+			else:
+				var near = lodR.near
+				var far = lodR.far
+				for i in lod.lods:
+					i.set_draw_range_begin(near)
+					i.set_draw_range_end(far)
+					if not i.is_visible():
+						i.show()
+			of += 1
+			index += 1
+
+#######
 # mound the entire scene
+#######
 func _ready():
-	setup_resources()
-	var mat = setup_matrix()
-	var instances = []
-	for i in range(mesh_layers.size()):
-		var multimesh_i = MultiMeshInstance.new()
-		var multimesh = MultiMesh.new()
-		multimesh.set_mesh( mesh_layers[i] )
-		multimesh_i.set_multimesh(multimesh)
-		if material_layers[i]:
-			multimesh_i.set_material_override( material_layers[i] )
-		multimesh_i.set_flag(GeometryInstance.FLAG_CAST_SHADOW,false)
-		multimesh_i.set_flag(GeometryInstance.FLAG_RECEIVE_SHADOWS,false)
-		multimesh_i.set_draw_range_begin(get_parent().get_draw_range_begin())
-		multimesh_i.set_draw_range_end(get_parent().get_draw_range_end())
-		var layer_data = data[i]
-		multimesh.set_instance_count( ceil(layer_data.size()/6) )
-		var i2 = 0
-		var ic = 0
-		while i2<layer_data.size():
-			var index	= layer_data[i2]
-			var rot		= layer_data[i2+1]
-			var scl		= layer_data[i2+2]
-			var x		= layer_data[i2+3]
-			var y		= layer_data[i2+4]
-			var z		= layer_data[i2+5]
-			i2 += 6
-			var basis = mat[index].basis.scaled(Vector3(scl,scl,scl)).rotated(Vector3(0,1,0),rot)
-			var v = mat[index].origin
-			var tr = Transform(basis,Vector3(x,y,z))
-			multimesh.set_instance_transform(ic,tr)
-			ic += 1
-		multimesh.generate_aabb()
-		add_child(multimesh_i)
+	var size = get_parent().get_aabb().size
+	var msize = get_parent().get_aabb().size/2
+	msize.y = 0
+	var start = get_parent().get_aabb().pos
+	start.y = 0
+	space_division_size.y = 0
+	for layer_index in range(mesh_layers_data.size()):
+		var layer = Spatial.new()
+		layer.set_name(layer_names[layer_index])
+		add_child(layer)
+		var mesh_lvl_data = mesh_layers_data[layer_index]
+		var layer_data = data[layer_index]
+		var division_index = 0
+		for mz in range(ceil(size.z/space_division_size.z)):
+			for mx in range(ceil(size.x/space_division_size.x)):
+				var dt = data[layer_index][division_index]
+				division_index += 1
+				if dt.size():
+					var pos = start + space_division_size*0.5 + Vector3(mx, 0, mz) * space_division_size
+					for lod in mesh_lvl_data:
+						var multimesh_i = MultiMeshInstance.new()
+						var multimesh = MultiMesh.new()
+						if lod.resource == null:
+							lod.resource = ResourceLoader.load(lod.mesh,'Mesh')
+						multimesh.set_mesh(lod.resource)
+						multimesh_i.set_multimesh(multimesh)
+						multimesh_i.set_draw_range_begin(lod.near)
+						multimesh_i.set_draw_range_end(lod.far)
+						multimesh_i.set_translation(pos)
+						if lod.material_override != '':
+							if lod.material == null:
+								lod.material = ResourceLoader.load(lod.material_override,'Material')
+							multimesh_i.set_material_override(lod.material)
+						lod.lods.append(multimesh_i)
+						multimesh.set_instance_count( dt.size()/5 )
+						var inst = 0
+						for i in range(0,dt.size(),5):
+							var s = dt[i]
+							var bs = Matrix3().scaled(Vector3(s,s,s)).rotated(Vector3(0,1,0),dt[i+1])
+							var tr = Transform(bs,Vector3(dt[i+2],dt[i+3],dt[i+4]))
+							multimesh.set_instance_transform(inst, tr)
+							inst += 1
+						multimesh.generate_aabb()
+						layer.add_child(multimesh_i)
+	# clean memory
+	data = null
 	
-
 
