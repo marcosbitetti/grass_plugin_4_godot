@@ -2,3 +2,11 @@
 *.swp
 *.swo
 .fscache
+.import/
+.mono/
+export.cfg
+temp/
+.db
+Thumbs.db
+.DS_Store
+.directory
